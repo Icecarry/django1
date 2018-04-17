@@ -115,14 +115,17 @@ AUTH_USER_MODEL = 'tt_user.User'
 # 发送邮件的驱动
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 # 邮件服务器
-EMAIL_HOST = 'smtp.qq.com'
+# EMAIL_HOST = 'smtp.qq.com'
+EMAIL_HOST = 'smtp.163.com'
 # smtp服务器的端口
-EMAIL_PORT = 465
+# EMAIL_PORT = 465
+EMAIL_PORT = 25
 # 发送邮件的邮箱
-EMAIL_HOST_USER = '1641540129@qq.com'
-# EMAIL_HOST_USER = '15605273810@163.com'
+# EMAIL_HOST_USER = '1641540129@qq.com'
+EMAIL_HOST_USER = '15605273810@163.com'
 # 在邮箱中设置的客户端授权密码
-EMAIL_HOST_PASSWORD = 'yapepjlbhxuzeicc'
-# EMAIL_HOST_PASSWORD = 'shixun123'
+# EMAIL_HOST_PASSWORD = 'yapepjlbhxuzeicc'
+EMAIL_HOST_PASSWORD = 'shixun123'
 # 收件人看到的发件人
-EMAIL_FROM = '天天生鲜<1641540129@qq.com>'
+EMAIL_FROM = '天天生鲜<15605273810@163.com>'
+# EMAIL_FROM = '天天生鲜<1641540129@qq.com>'

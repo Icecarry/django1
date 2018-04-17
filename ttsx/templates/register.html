@@ -22,7 +22,8 @@
 				<a href="#">登录</a>
 			</div>
 			<div class="reg_form clearfix">
-				<form method="post" action="/user/register">
+{#				<form method="post" action="/user/register">#}
+				<form method="post" action="/user/send_active_mail">
                     {% csrf_token %}
 				<ul>
 					<li>

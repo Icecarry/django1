@@ -1,7 +1,7 @@
 import re
 
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.generic import View
 
 from .models import User
@@ -60,6 +60,7 @@ class RegisterView(View):
         usr.is_active = False
         usr.save()
 
+
         # 5.提示：请到邮箱中激活
         return HttpResponse('请到邮箱中激活')
 
@@ -85,14 +86,14 @@ def user_name(request):
 def send_active_mail(request):
     # pk是主键的意思
     # 查找邮箱
-    user = User.objects.get(pk=1)
+    user = User.objects.get(pk=7)
     # # 对用户编号进行加密
     # user_dirt = {'user_id': user.id}
     # serializer = Serializer(settings.SECRET_KEY, expires_in=5)
     # str1 = serializer.dump(user_dirt).decode()
     #
     # # 需要指定激活账号的编号
-    # mail_body = '<a href="http://127.0.0.1:8888/user/active/%s"></a>' %str1
+    # mail_body = '<a href="http://127.0.0.1:8888/user/active/%s">点击激活</a>' %str1
     # # 内容个如果为html，则第二个参数留空，再设置html_message参数
     # send_mail('用户激活', '', settings.EMAIL_FROM, [user.email], html_message=mail_body)
 
@@ -109,7 +110,7 @@ def user_active(request, user_str):
     serializer = Serializer(settings.SECRET_KEY)
     # 如果超过规定时间则抛出异常
     try:
-        user_dict = serializer.load(user_str)
+        user_dict = serializer.loads(user_str)
         user_id = user_dict.get('user_id')
         print('---------------%s' %user_id)
     except:
