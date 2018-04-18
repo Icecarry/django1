@@ -1,15 +1,17 @@
 import re
 
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.views.generic import View
-
-from .models import User
-
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from django.conf import settings
+
 from utils import celery_tasks
-from django.core.mail import send_mail
+from .models import User, AreaInfo, Address
+
+# django提供的用户验证功能
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 
 # Create your views here.
 # 1.定义视图，显示注册页面
@@ -24,7 +26,10 @@ from django.core.mail import send_mail
 
 class RegisterView(View):
     def get(self, request):
-        return render(request, 'register.html')
+        context = {
+            'title': '注册',
+        }
+        return render(request, 'register.html', context)
 
     def post(self, request):
         # 1.接收所有请求的数据
@@ -55,13 +60,14 @@ class RegisterView(View):
             return render(request, 'register.html')
 
         # 4.保存用户对象
-        usr = User.objects.create_user(user_name, email, pwd)
+        user = User.objects.create_user(user_name, email, pwd)
         # 这里用户创建后默认是激活状态，但实际需要用户手动激活，所以取消激活
-        usr.is_active = False
-        usr.save()
-
+        user.is_active = False
+        user.save()
 
         # 5.提示：请到邮箱中激活
+        celery_tasks.send_active_mail.delay(user.email, user.id)
+
         return HttpResponse('请到邮箱中激活')
 
 
@@ -86,7 +92,7 @@ def user_name(request):
 def send_active_mail(request):
     # pk是主键的意思
     # 查找邮箱
-    user = User.objects.get(pk=7)
+    user = User.objects.get(pk=9)
     # # 对用户编号进行加密
     # user_dirt = {'user_id': user.id}
     # serializer = Serializer(settings.SECRET_KEY, expires_in=5)
@@ -112,7 +118,7 @@ def user_active(request, user_str):
     try:
         user_dict = serializer.loads(user_str)
         user_id = user_dict.get('user_id')
-        print('---------------%s' %user_id)
+        print('---------------%s' % user_id)
     except:
         return HttpResponse('地址无效')
     # 2.根据编号查询用户对象
@@ -122,3 +128,117 @@ def user_active(request, user_str):
     user.save()
     # 4.提示：转到登录页
     return redirect('/user/login')
+
+
+class LoginView(View):
+    # 登陆
+    def get(self, request):
+        # 从cookies中读取用户名，并显示在界面中
+        username = request.COOKIES.get('username', '')
+        context = {
+            'username': username,
+            'title': '登录'
+        }
+
+        return render(request, 'login.html', context)
+
+    def post(self, request):
+        # 1.接收
+        dict1 = request.POST
+        username = dict1.get('username')
+        pwd = dict1.get('pwd')
+        remember = dict1.get('remember')
+
+        # 2.验证完整性
+        if not all([username, pwd]):
+            return render(request, 'login.html')
+
+        # 3.验证正确性,查询用户名与密码对应的用户是否存在
+        # 如果用户名密码正确则返回user对象, 否则返回None
+        user = authenticate(username=username, password=pwd)
+
+        # 判断用户是否正确
+        if user is None:
+            return render(request, 'login.html', {'msg': '用户名密码错误'})
+
+        # 加逻辑1:-----状态保持
+        # 1.配置session
+        # 2.login
+        login(request, user)
+
+        # 加逻辑3:如果有来源页面，则转到那个页面，如果没有，则转到首页
+        login_url = request.GET.get('next', '/')
+        response = redirect(login_url)
+
+        # 加逻辑2:----记住用户名，存储到cookies中
+        if remember is None:
+            response.delete_cookie('username')
+        else:
+            response.set_cookie('username', username, expires=60*60*24*7)
+
+        # 用户名密码正确返回首页
+        return response
+
+
+def user_logout(request):
+    logout(request)
+    return redirect('/user/login')
+
+
+@login_required
+def info(request):
+    # 判断用户是否登陆，登陆显示信息，未登录转到登陆页
+    # if not request.user.is_authenticated():
+    #     return redirect('/user/login')
+
+    context = {
+        'title': '个人信息',
+    }
+
+    return render(request, 'user_center_info.html', context)
+
+
+@login_required
+def order(request):
+    context = {
+        'title': '全部订单'
+    }
+
+    return render(request, 'user_center_order.html', context)
+
+
+@login_required
+def site(request):
+    # 获取用户
+    user = request.user
+    # 查找当前用户的所有收货地址
+    addr_list = user.address_set.all()
+
+    context = {
+        'title': '收货地址',
+        'addr_list': addr_list,
+    }
+
+    return render(request, 'user_center_site.html', context)
+
+
+def area(request):
+    # 接收请求地址的编号，查询这个请求地址编号为父级的地区
+    pid = request.GET.get('pid')
+    print(pid)
+    if pid is None:
+        # 查询省信息
+        area_list = AreaInfo.objects.filter(aParent__isnull=True)
+    else:
+        # 如果pid是省的编号则查询市的编号，如果pid是市的编号则查询区的编号
+        area_list = AreaInfo.objects.filter(aParent_id=pid)
+
+    # 重新整理结构为{'id':***, 'title': ***}
+    list1 = []
+    for a in area_list:
+        list1.append({'a': a.id, 'title': a.atitle})
+
+    # print(list1[1])
+    # 返回的格式为{'list1: [{},{},{},...]}
+    return JsonResponse({'list1': list1})
+
