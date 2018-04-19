@@ -147,3 +147,20 @@ SESSION_CACHE_ALIAS = "default"
 
 # 登陆地址
 LOGIN_URL = '/user/login'
+
+# 设置fdfs的客户端配置文件
+FDFS_CLIENT = os.path.join('utils/fdfs_client.conf')
+
+# 指定保存文件的类型
+DEFAULT_FILE_STORAGE = 'utils.fdfsStorage.FdfsStorage'
+
+# 配置Ningx访问fdfs的路径
+FDFS_URL = 'http://127.0.0.1:8888/'
+
+# 富文本编辑器
+TINYMCE_DEFAULT_CONFIG = {
+  'theme': 'advanced', # 丰富样式
+  'width': 600,
+  'height': 400,
+}
+

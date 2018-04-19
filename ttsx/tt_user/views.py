@@ -13,6 +13,8 @@ from .models import User, AreaInfo, Address
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
+from utils.views import LoginRequiredViewMixin, LoginRequiredView
+
 # Create your views here.
 # 1.定义视图，显示注册页面
 # 2.定义视图，接收表单数据，完成用户的添加操作
@@ -24,7 +26,8 @@ from django.contrib.auth.decorators import login_required
 # def register_user(request):
 #     return HttpResponse('ok')
 
-class RegisterView(View):
+
+class RegisterView(LoginRequiredView, View):
     def get(self, request):
         context = {
             'title': '注册',
@@ -207,19 +210,44 @@ def order(request):
     return render(request, 'user_center_order.html', context)
 
 
-@login_required
-def site(request):
-    # 获取用户
-    user = request.user
-    # 查找当前用户的所有收货地址
-    addr_list = user.address_set.all()
+# @login_required
+# def site(request):
+class SiteView(LoginRequiredViewMixin, View):
+    def get(self, request):
+        # 获取用户
+        user = request.user
+        # 查找当前用户的所有收货地址
+        addr_list = user.address_set.all()
 
-    context = {
-        'title': '收货地址',
-        'addr_list': addr_list,
-    }
+        context = {
+            'title': '收货地址',
+            'addr_list': addr_list,
+        }
+        return render(request, 'user_center_site.html', context)
 
-    return render(request, 'user_center_site.html', context)
+    def post(self, request):
+        # 接收数据
+        dict1 = request.POST
+        receiver_name = dict1.get('receiver_name')
+        province_id = dict1.get('province')
+        city_id = dict1.get('city')
+        district_id = dict1.get('district')
+        detail_addr = dict1.get('detail_addr')
+        zip_code = dict1.get('zip_code')
+        receiver_mobile = dict1.get('receiver_mobile')
+        # 创建对象
+        addr = Address()
+        addr.receiver_name = receiver_name
+        addr.province_id = province_id
+        addr.city_id = city_id
+        addr.district_id = district_id
+        addr.detail_addr = detail_addr
+        addr.zip_code = zip_code
+        addr.receiver_mobile = receiver_mobile
+        addr.user_id = request.user.id
+        # 保存
+        addr.save()
+        return redirect('/user/site')
 
 
 def area(request):
@@ -236,7 +264,7 @@ def area(request):
     # 重新整理结构为{'id':***, 'title': ***}
     list1 = []
     for a in area_list:
-        list1.append({'a': a.id, 'title': a.atitle})
+        list1.append({'id': a.id, 'title': a.atitle})
 
     # print(list1[1])
     # 返回的格式为{'list1: [{},{},{},...]}
