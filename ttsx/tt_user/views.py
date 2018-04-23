@@ -14,6 +14,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
 from utils.views import LoginRequiredViewMixin, LoginRequiredView
+from django_redis import get_redis_connection
+from tt_goods.models import GoodsSKU
 
 # Create your views here.
 # 1.定义视图，显示注册页面
@@ -194,8 +196,35 @@ def info(request):
     # if not request.user.is_authenticated():
     #     return redirect('/user/login')
 
+    # 查询最近浏览信息
+    browser_key = 'browser%d'%request.user.id
+    # 创建redis连接
+    redis_clietn = get_redis_connection()
+    # 获取列表数据
+    skuid_list = redis_clietn.lrange(browser_key, 0, -1)
+    # 根据编号查询商品对象
+    sku_list = []
+    for skuid in skuid_list:
+        sku_list.append(GoodsSKU.objects.get(pk=skuid))
+    # 查询收货地址的第一条显示
+    addr_list = request.user.address_set.all()
+    mobile=''
+    addr=''
+    # 判断数据是否为空
+    if addr_list is not None:
+        addr1 = addr_list[0]
+        mobile = addr1.receiver_mobile
+        addr = '%s %s %s %s'%(addr1.province.atitle,
+                              addr1.city.atitle,
+                              addr1.district.atitle,
+                              addr1.detail_addr,
+                              )
+
     context = {
         'title': '个人信息',
+        'sku_list': sku_list,
+        'mobile': mobile,
+        'addr': addr,
     }
 
     return render(request, 'user_center_info.html', context)
