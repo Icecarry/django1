@@ -1,11 +1,13 @@
-from django.shortcuts import render
-from django.http import Http404
-from .models import *
 from django.core.cache import cache
+from django.core.paginator import Paginator
+from django.http import Http404
+from django.shortcuts import render
 from django_redis import get_redis_connection
-from django.core.paginator import Paginator,Page
-from django.conf import settings
-import os
+
+from .models import *
+
+from haystack.generic_views import SearchView
+
 # Create your views here.
 
 
@@ -24,9 +26,11 @@ def index(request):
         # 4.遍历分类，查询每个分类的标题推荐、图片推荐
         for category in category_list:
             # 查询指定分类的标题推荐
-            category.title_list = IndexCategoryGoodsBanner.objects.filter(category=category, display_type=0).order_by('index')
+            category.title_list = IndexCategoryGoodsBanner.objects.filter(category=category, display_type=0).order_by(
+                'index')
             # 查询指定这个分类的图片推荐
-            category.image_list = IndexCategoryGoodsBanner.objects.filter(category=category, display_type=1).order_by('index')
+            category.image_list = IndexCategoryGoodsBanner.objects.filter(category=category, display_type=1).order_by(
+                'index')
         context = {
             'category_list': category_list,
             'index_goods_banner_list': index_goods_banner_list,
@@ -62,7 +66,7 @@ def detail(request, sku_id):
 
     # 最近浏览,判断用户是否登录
     if request.user.is_authenticated():
-        browser_key = 'browser%d'%request.user.id
+        browser_key = 'browser%d' % request.user.id
         # 创建redis服务器的连接,默认使用settings中-->cache中的配置
         redis_client = get_redis_connection()
         # 如果当前商品已存在，则删除
@@ -104,18 +108,89 @@ def goods_list(request, category_id):
     # new_list = GoodsSKU.objects.filter(category_id=category_id).order_by('-id')[0:2]
     new_list = category.goodssku_set.order_by('-id')[0:2]
 
-    # 本分类的商品列表(分页)
-    sku_list = GoodsSKU.objects.filter(category_id=category_id).order_by('-id')
-    # 对商品列表进行分页
-    paginator = Paginator(sku_list, 15)
-    # 获取第n页的数据
-    page = paginator.page(1)
+    # 接收排序规则
+    sort_str = '-id'  # 默认根据编号,最新
+    sort = request.GET.get('sort', '1')
+    if sort == '2':
+        sort_str = 'price'  # 价格
+    elif sort == '4':
+        sort_str = '-price'  # 最贵
+    elif sort == '3':
+        sort_str = 'sales'  # 根据销量排序
+    else:
+        sort = '1'
 
+
+    # 本分类的商品列表(分页)
+    sku_list = GoodsSKU.objects.filter(category_id=category_id).order_by(sort_str)
+    # 对商品列表进行分页
+    paginator = Paginator(sku_list, 1)
+
+    # 获取总页数
+    num_pages = paginator.num_pages
+
+    # 接收分页的页码
+    pindex = request.GET.get('pindex', '1')
+
+    # 验证页码的有效性
+    try:
+        pindex = int(pindex)
+    except:
+        pindex = 1
+    if pindex <= 1:
+        pindex = 1
+    if pindex >= num_pages:
+        pindex = num_pages
+
+    # 获取第n页的数据
+    page = paginator.page(pindex)
+
+    # 已当前页码为准,构造页码列表
+    # 如果当前页码不足5个，则显示所有页码
+    # if num_pages <= 5:
+    #     plist = range(1, num_pages + 1)
+    # elif pindex <= 2:  # 如果当前页码小于等于２
+    #     plist = range(1, 6)
+    # elif pindex >= num_pages - 1:
+    #     plist = range(num_pages - 4, num_pages + 1)
+    # else:
+    #     plist = range(pindex - 2, pindex + 3)
+    plist = get_page_list(num_pages, pindex)
     context = {
         'title': '商品列表页面',
         'category_list': category_list,
         'new_list': new_list,
         'page': page,
         'category': category,
+        'plist': plist,
+        'sort': sort,
     }
     return render(request, 'list.html', context)
+
+
+class MySearchView(SearchView):
+    """My custom search view."""
+    # 自定义向模板中传递的上下文
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(*args, **kwargs)
+        # 运行完视图,会向模板中传递分页对象，当前页对象
+        paginator = context['paginator']
+        page = context['page_obj']
+        # do something
+        context['plist'] = get_page_list(paginator.num_pages, page.number)
+
+        # 向模板中传递分类信息
+        context['category_list'] = GoodsCategory.objects.filter(isDelete=False)
+        return context
+
+
+def get_page_list(num_pages, pindex):
+    if num_pages <= 5:
+        plist = range(1, num_pages + 1)
+    elif pindex <= 2:  # 如果当前页码小于等于２
+        plist = range(1, 6)
+    elif pindex >= num_pages - 1:
+        plist = range(num_pages - 4, num_pages + 1)
+    else:
+        plist = range(pindex - 2, pindex + 3)
+    return plist
