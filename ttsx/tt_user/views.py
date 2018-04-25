@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from utils.views import LoginRequiredViewMixin, LoginRequiredView
 from django_redis import get_redis_connection
 from tt_goods.models import GoodsSKU
-
+import json
 # Create your views here.
 # 1.定义视图，显示注册页面
 # 2.定义视图，接收表单数据，完成用户的添加操作
@@ -181,6 +181,32 @@ class LoginView(View):
         else:
             response.set_cookie('username', username, expires=60*60*24*7)
 
+        # 扩展代码,将cookie中的购物车数据,存入redis中
+        # 读取cookie中的购物车信息
+        cart_str = request.COOKIES.get('cart')
+        # 判断是否存在购物车信息
+        if cart_str:
+            # 获取redis的信息
+            redis_client = get_redis_connection()
+            # 创建购物车的键
+            key = 'cart%d'%request.user.id
+            # 将购物车字符串转换成字典
+            cart_dict = json.loads(cart_str)
+            # 逐个遍历购物车中的商品编号k,数量v
+            for k,v in cart_dict.items():
+                # 从redis中获取商品k的数量,如果没有则返回None
+                count_redis = redis_client.hget(key, k)
+                # 如果这个商品在redis中存在，则相加
+                if count_redis is not None:
+                    # 相加,注意从redis中读取数据的类型为bytes，需要改为int
+                    v += int(count_redis)
+                    # 上限判断
+                    if v>5:
+                        v = 5
+                # 将当前用户的购物车中的商品编号与对应数量写入redis中
+                redis_client.hset(key, k, v)
+            # 删除cookie中购物车信息
+            response.delete_cookie('cart')
         # 用户名密码正确返回首页
         return response
 

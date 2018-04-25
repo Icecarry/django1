@@ -56,6 +56,7 @@ class IndexCategoryGoodsBannerAdmin(BaseAdmin):
 class IndexGoodsBannerAdmin(BaseAdmin):
     list_display = ['id', 'sku', 'index']
 
+
 class IndexPromotionBannerAdmin(BaseAdmin):
     list_display = ['id', 'name', 'url', 'index']
 

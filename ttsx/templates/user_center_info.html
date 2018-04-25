@@ -1,5 +1,21 @@
 {% extends 'base_user.html' %}
 
+{% block script %}
+    <script>
+    function add_cart(sku_id) {
+        $.post('/cart/add', {
+                'sku_id': sku_id,
+                'count': 1,
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+            }, function (data) {
+            if (data.result == 'ok'){
+             $('#show_count').html(data.total_count);
+            }
+        });
+    }
+    </script>
+{% endblock %}
+
 {% block body1 %}
 
 	<div class="main_con clearfix">
@@ -31,7 +47,7 @@
 					<div class="operate">
 						<span class="prize">￥{{ sku.price }}</span>
 						<span class="unit">{{ sku.price }}/{{ sku.unit }}</span>
-						<a href="#" class="add_goods" title="加入购物车"></a>
+						<a href="javascript:add_cart({{ sku.id }});" class="add_goods" title="加入购物车"></a>
 					</div>
 				</li>
                             {% empty %}

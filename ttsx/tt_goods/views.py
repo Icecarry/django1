@@ -1,12 +1,14 @@
+import json
+
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import render
 from django_redis import get_redis_connection
+from haystack.generic_views import SearchView
 
 from .models import *
 
-from haystack.generic_views import SearchView
 
 # Create your views here.
 
@@ -38,6 +40,9 @@ def index(request):
         }
 
         cache.set('index_data', context)
+
+    # 计算购物车总数量
+    context['total_count'] = get_cart_total(request)
 
     response = render(request, 'index.html', context)
     # # 响应体
@@ -91,6 +96,9 @@ def detail(request, sku_id):
         'sku_list': sku_list,
     }
 
+    # 计算购物车总数量
+    context['total_count'] = get_cart_total(request)
+
     return render(request, 'detail.html', context)
 
 
@@ -119,7 +127,6 @@ def goods_list(request, category_id):
         sort_str = 'sales'  # 根据销量排序
     else:
         sort = '1'
-
 
     # 本分类的商品列表(分页)
     sku_list = GoodsSKU.objects.filter(category_id=category_id).order_by(sort_str)
@@ -165,11 +172,16 @@ def goods_list(request, category_id):
         'plist': plist,
         'sort': sort,
     }
+
+    # 计算购物车总数量
+    context['total_count'] = get_cart_total(request)
+
     return render(request, 'list.html', context)
 
 
 class MySearchView(SearchView):
     """My custom search view."""
+
     # 自定义向模板中传递的上下文
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(*args, **kwargs)
@@ -181,6 +193,10 @@ class MySearchView(SearchView):
 
         # 向模板中传递分类信息
         context['category_list'] = GoodsCategory.objects.filter(isDelete=False)
+
+        # 计算购物车总数量
+        context['total_count'] = get_cart_total(self.request)
+        context['title'] = ''
         return context
 
 
@@ -194,3 +210,34 @@ def get_page_list(num_pages, pindex):
     else:
         plist = range(pindex - 2, pindex + 3)
     return plist
+
+
+def get_cart_total(request):
+    '''查询购物车中的数据'''
+    total_count = 0
+    # 判断用户是否登录
+    if request.user.is_authenticated():
+        # 如果登录则从redis中读取数据
+        # 连接redis
+        redis_client = get_redis_connection()
+        # 构造键
+        key = 'cart%d' % request.user.id
+        # 获取所有数量
+        count_list = redis_client.hvals(key)
+        # 遍历相加
+        if count_list:
+            for count in count_list:
+                total_count += int(count)
+
+    else:
+        # 如果未登录则从cookie中读取数据
+        # 读取cookie
+        cart_str = request.COOKIES.get('cart')
+        if cart_str is not None:
+            # 将字符串转换成字典
+            cart_dict = json.loads(cart_str)
+            # 遍历相加
+            for k, v in cart_dict.items():
+                total_count += v
+
+    return total_count
