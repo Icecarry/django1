@@ -150,3 +150,95 @@ def index(request):
     }
 
     return render(request, 'cart.html', context)
+
+
+def edit(request):
+    if request.method != 'POST':
+        return Http404()
+    # 接收请求的数据, 商品编号,数量
+    dict1 = request.POST
+    # 商品编号
+    sku_id = dict1.get('sku_id')
+    # 数量
+    count = dict1.get('count')
+
+    # 验证数据有效性
+    if not all([sku_id, count]):
+        return JsonResponse({'result', '参数不完整'})
+
+    # 验证sku_id是否合法
+    if GoodsSKU.objects.filter(pk=sku_id).count() != 1:
+        return JsonResponse({'result', '商品编号错误'})
+
+    # 验证count 是否合法
+    try:
+        count = int(count)
+    except:
+        return JsonResponse({'result', '数量必须是整数'})
+
+    if count < 1:
+        return JsonResponse({'result', '数量必须大于1'})
+    if count > 5:
+        return JsonResponse({'result', '数量必须小于5'})
+
+    response = JsonResponse({'result': 'ok'})
+
+    if request.user.is_authenticated():
+        # 如果用户登录则修改redis中的数据
+        # 获取redis连接
+        redis_client = get_redis_connection()
+        # 创建key
+        key = 'cart%d'%request.user.id
+        # 修改
+        redis_client.hset(key, sku_id, count)
+    else:
+        # 如果用户未登录则修改cookie中的数据
+        # 读取cookie中的购物车数据
+        cart_str = request.COOKIES.get('cart')
+        if cart_str:
+            # 字符串转成字典
+            cart_list = json.loads(cart_str)
+            # 修改
+            cart_list[sku_id] = count
+            # 字典转成字符串
+            cart_str = json.dumps(cart_list)
+            # 保存
+            response.set_cookie('cart', cart_str, expires=60*60*24*7)
+
+    return response
+
+
+def cart_delete(request):
+    # 因为是删除,只支持post请求方式
+    if request.method != 'POST':
+        return Http404()
+    # 获取商品编号
+    sku_id = request.POST.get('sku_id')
+
+    response = JsonResponse({'result': 'ok'})
+
+    # 判断用户是否登录
+    if request.user.is_authenticated():
+        # 从redis中删除数据
+        # 获取redis连接
+        redis_client = get_redis_connection()
+        # 构造键key
+        key = 'cart%d'%request.user.id
+        # 删除
+        redis_client.hdel(key, sku_id)
+    else:
+        # 从cookie 中删除数据
+        # 读取cookie中的购物车数据
+        cart_str = request.COOKIES.get('cart')
+        # 将字符串转成字典
+        cart_list = json.loads(cart_str)
+        # 判断字典中是否有这个商品
+        if sku_id in cart_list:
+            # 从字典中删除键
+            cart_list.pop(sku_id)
+            # 将字典转成字符串
+            cart_str = json.dumps(cart_list)
+            # 保存
+            response.set_cookie('cart', cart_str, expires=60*60*24*7)
+
+    return response
