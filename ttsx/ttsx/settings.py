@@ -160,7 +160,7 @@ FDFS_URL = 'http://127.0.0.1:8888/'
 
 # 富文本编辑器
 TINYMCE_DEFAULT_CONFIG = {
-  'theme': 'advanced', # 丰富样式
+  'theme': 'advanced',  # 丰富样式
   'width': 600,
   'height': 400,
 }

@@ -145,8 +145,6 @@ def index(request):
     context = {
         'title': '我的购物车',
         'cart_list': cart_list,
-
-
     }
 
     return render(request, 'cart.html', context)

@@ -13,7 +13,7 @@ from .models import User, AreaInfo, Address
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
-from utils.views import LoginRequiredViewMixin, LoginRequiredView
+from utils.views import LoginRequiredViewMixin
 from django_redis import get_redis_connection
 from tt_goods.models import GoodsSKU
 import json
@@ -29,7 +29,7 @@ import json
 #     return HttpResponse('ok')
 
 
-class RegisterView(LoginRequiredView, View):
+class RegisterView(View):
     def get(self, request):
         context = {
             'title': '注册',

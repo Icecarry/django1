@@ -34,6 +34,7 @@ def index(request):
             category.image_list = IndexCategoryGoodsBanner.objects.filter(category=category, display_type=1).order_by(
                 'index')
         context = {
+            'title': '首页',
             'category_list': category_list,
             'index_goods_banner_list': index_goods_banner_list,
             'index_promotion_list': index_promotion_list,
